@@ -1,67 +1,45 @@
 <?php
-require_once 'includes/config.php'; 
-
-
 session_start();
+require_once 'config.php';
 
-
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $username = $_POST['username'];
     $password = $_POST['password'];
 
-    
-    if (empty($username) || empty($password)) {
-        $error = "All fields are required.";
-    } else {
-        try {
-           
-            $pdo = new PDO("mysql:host=".DB_SERVER.";dbname=".DB_NAME, DB_USERNAME, DB_PASSWORD);
-            $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    // Prepare SQL statement to fetch user
+    $stmt = $pdo->prepare("SELECT * FROM users WHERE username = :username");
+    $stmt->bindParam(':username', $username);
+    $stmt->execute();
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            
-            $stmt = $pdo->prepare("SELECT id, username, password FROM users WHERE username = :username");
-            $stmt->bindParam(':username', $username);
-            $stmt->execute();
+    if ($user && password_verify($password, $user['password'])) {
+        // Store user data in session
+        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['username'] = $user['username'];
+        $_SESSION['role'] = $user['role'];
 
-            
-            if ($stmt->rowCount() == 1) {
-                $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-                
-                if (password_verify($password, $row['password'])) {
-                    
-                    $_SESSION['loggedin'] = true;
-                    $_SESSION['id'] = $row['id'];
-                    $_SESSION['username'] = $row['username'];
-
-                    
-                    header("location: home.php");
-                    exit;
-                } else {
-                    $error = "Invalid password.";
-                }
-            } else {
-                $error = "No account found with that email.";
-            }
-        } catch (PDOException $e) {
-            $error = "Error: " . $e->getMessage();
+        // Redirect based on user role
+        if ($user['role'] == 'consulter') {
+            header("Location: request_form.php");
+        } else {
+            header("Location:home");
         }
+        exit();
+    } else {
+        echo "Invalid username or password!";
     }
 }
-?> 
+?>
 <!DOCTYPE html>
 <html>
   <head>
     <title>Login</title>
-
     <link rel="stylesheet" href="login.css" />
-  </head>
+  </head> 
   <body>
-  
   <div class="form-container">
 	<p class="title">Login</p>
-	<form class="form" method="post" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>">
+	<form class="form" method="post" action="login.php">
 		<div class="input-group">
 			<label for="username">Username</label>
 			<input type="text" name="username" id="username" placeholder="">
